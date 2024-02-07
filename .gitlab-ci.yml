@@ -1,0 +1,26 @@
+stages:
+  - build
+
+before_script:
+  - export JAVA_HOME="/opt/homebrew/opt/openjdk@17/"
+  - export ANDROID_HOME="/Users/getresponse/Library/Android/sdk/"
+
+build_android:
+  stage: build
+  tags:
+    - m1-android
+  only:
+    refs:
+      - merge_requests
+      - develop
+      - main
+  variables:
+    SECURE_FILES_DOWNLOAD_PATH: 'app/'
+  script:
+    - curl -s https://gitlab.com/gitlab-org/incubation-engineering/mobile-devops/download-secure-files/-/raw/main/installer | bash
+    - ./gradlew assembleDebug
+    - cp app/build/outputs/apk/debug/app-debug.apk PushTestsApk.apk
+  artifacts:
+    expose_as: "APK File"
+    paths: ["PushTestsApk.apk"]
+    expire_in: 10 days
