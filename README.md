@@ -2,23 +2,22 @@
 GetResponse Mobile SDK is a wrapper for Firebase Messaging. Because every app is different, and you as a developer may want to hook our SDK into existing codebase or even existing push handling - we provide a simple API to handle intercepting messages sent by GetResponse and API connection to register users in the backend.
 Installation
 
-Use jitpack.io to include the library in your project. Add the following to your root build.gradle file:
+Use jitpack.io to include the library in your project. Add the following to your root settings.gradle file:
 
 ```groovy
     dependencyResolutionManagement {
-		repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-		repositories {
-			mavenCentral()
-			maven { url "https://jitpack.io" }
-		}
-	}
+        repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+            repositories {
+                mavenCentral()
+                maven { url "https://jitpack.io" }
+	    }
 ```
 
 Add library dependency
 ```groovy
     dependencies {
-	    implementation "com.github.GetResponse:MobileSDK-Android:1.0.1"
-	}
+        implementation "com.github.GetResponse:MobileSDK-Android:1.0.1"
+    }
 ```
 
 ## Requirements
