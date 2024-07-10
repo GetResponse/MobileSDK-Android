@@ -119,14 +119,39 @@ class GetResponseMobileSDK(
     }
 
     fun handleIncomingNotification(context: Context, intent: Intent?): Map<String, String>? {
+        var data: Map<String, String>?
+        var isLocal = true
         val intentWithData = intent ?: return null
-        val data = getDataFromNotification(intentWithData) ?: return null
+        data = getDataFromNotification(intentWithData)
+        if (data == null) {
+            isLocal = false
+            data = intent.extras?.let { extras ->
+                val map = mutableMapOf<String, String>()
+                extras.keySet().forEach { key ->
+                    map[key] = extras[key].toString()
+                }
+                map
+            }
+        }
+        if (data == null || data["issuer"] != "getresponse") {
+            Log.e(TAG, "No data in notification")
+            return null
+        }
+        if (data["issuer"] != "getresponse") {
+            Log.e(TAG, "No GetResponse notification")
+            return null
+        }
         if (data["redirect_type"] == "url" && data.containsKey("redirect_destination")) {
             val i = Intent(Intent.ACTION_VIEW)
             i.setData(Uri.parse(data["redirect_destination"]))
             context.startActivity(i)
         }
         scope.launch {
+            if (!isLocal) {
+                data["stats_url"]?.let {
+                    getStatsApi(enableDebug).stats(EventType.SHOWED.getEventUrl(it))
+                }
+            }
             data["stats_url"]?.let {
                 getStatsApi(enableDebug).stats(EventType.CLICKED.getEventUrl(it))
             }
@@ -152,6 +177,7 @@ class GetResponseMobileSDK(
         private const val DATA_KEY_IN_INTENT = "getresponse_mobile_sdk_data"
         private const val DEFAULT_CHANNEL_ID = "default"
         private const val DEFAULT_CHANNEL_NAME = "Default Channel"
+
         @Suppress("UNCHECKED_CAST")
         private fun getDataFromNotification(intent: Intent): Map<String, String>? =
             (intent.getSerializableExtra(DATA_KEY_IN_INTENT) as HashMap<String, String>?)?.toMap()
