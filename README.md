@@ -2,6 +2,9 @@
 GetResponse Mobile SDK is a wrapper for Firebase Messaging. Because every app is different, and you as a developer may want to hook our SDK into existing codebase or even existing push handling - we provide a simple API to handle intercepting messages sent by GetResponse and API connection to register users in the backend.
 Installation
 
+Full developers guide available on:
+https://www.getresponse.com/help/mobile-apps-technical-documentation-for-android.html
+
 Use jitpack.io to include the library in your project. Add the following to your root settings.gradle file:
 
 ```groovy
@@ -16,9 +19,12 @@ Use jitpack.io to include the library in your project. Add the following to your
 Add library dependency
 ```groovy
     dependencies {
-        implementation "com.github.GetResponse:MobileSDK-Android:1.0.1"
+        implementation "com.github.GetResponse:MobileSDK-Android:1.0.2"
+        coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
     }
 ```
+
+To ensure broad compatibility, our SDK uses 'Desugaring', a process that allows newer Java features to be used on older Android versions. This is enabled by the `coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'` dependency. Without it, using Java 8 features not supported by your minSdkVersion could lead to crashes on certain Android versions.
 
 ## Requirements
 App should be written in kotlin and target Android SDK 34
@@ -70,6 +76,7 @@ override fun onMessageReceived(remoteMessage: RemoteMessage) {
 }
 ```
 handleIncomingPush method will return boolean value. True if it detects a message sent by GetResponse, and false in all other cases.
+* When the application is in the background, delivery statistics will be counted only after clicking on the notification.
 
 ### Update Push Notification Consent:
 In order to support fcmToken changes app needs to register for this in onNewToken callback (https://firebase.google.com/docs/cloud-messaging/manage-tokens#retrieve-and-store-registration-tokens)
@@ -131,5 +138,7 @@ scope.launch {
 }
 ```
 
+## Kotlin Coroutines in Example Code
 
+The example code provided in this README uses Kotlin Coroutines for handling asynchronous operations. You'll encounter functions marked with `suspend`, which are part of the Coroutines API and can only be called within a Coroutine or another suspending function. If you're new to Coroutines, we recommend the [official Kotlin Coroutines guide](https://kotlinlang.org/docs/coroutines-guide.html).
 
