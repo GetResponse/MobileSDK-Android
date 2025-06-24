@@ -18,8 +18,13 @@ class PushService : FirebaseMessagingService() {
             applicationId,
             entryPoint,
             secretKey,
-            notificationIcon,
-        )
+            )
+
+    init {
+        scope.launch {
+            grMobileSDK.initialize()
+        }
+    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -28,7 +33,7 @@ class PushService : FirebaseMessagingService() {
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
-        val pushConsumed = grMobileSDK.handleIncomingPush(
+        val pushConsumed = grMobileSDK.pushNotificationsService.handleIncomingPush(
             remoteMessage.data,
             MainActivity::class.java
         )
@@ -39,7 +44,7 @@ class PushService : FirebaseMessagingService() {
         super.onNewToken(token)
         Log.d(TAG, "Refreshed token: $token")
         scope.launch {
-            grMobileSDK.consent(
+            grMobileSDK.pushNotificationsService.consent(
                 languageCode,
                 externalId,
                 email,

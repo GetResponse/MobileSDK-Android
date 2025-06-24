@@ -1,5 +1,9 @@
 package com.getresponse.mobile_sdk
 
+import com.getresponse.mobile_sdk.models.events.event_data.EventData
+import com.getresponse.mobile_sdk.models.events.EventPayload
+import com.getresponse.mobile_sdk.models.PresetsModel
+import com.getresponse.mobile_sdk.models.push_notifications.ConsentModel
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -20,7 +24,7 @@ class StandardHeadersInterceptor() : Interceptor {
             request()
                 .newBuilder()
                 .header("Content-Type", "application/json")
-                .header("X-Sdk-Version", "1.0")
+                .header("X-Sdk-Version", "1.1")
                 .header("X-Sdk-Platform", "Android")
                 .build()
 
@@ -54,6 +58,17 @@ interface GrMobileApiService {
     @DELETE("consents")
     fun consentDeleteCall(): Call<retrofit2_Response<Unit>>
 
+    @POST
+    suspend fun sendEvents(@Url url: String, @Body data: List<EventPayload<EventData>>): retrofit2_Response<Unit>
+
+    @POST
+    fun sendEventsCall(@Url url: String, @Body data: List<EventPayload<EventData>>): Call<retrofit2_Response<Unit>>
+
+    @GET("presets")
+    suspend fun presets(): PresetsModel
+
+    @GET("presets")
+    fun presetsCall(): Call<PresetsModel>
 }
 
 interface GrMobileStatsApiService {
@@ -62,16 +77,18 @@ interface GrMobileStatsApiService {
 }
 
 object GetResponseMobileSdkClient {
-    fun getApi(endPoint: String, token: String, enableDebug: Boolean): GrMobileApiService {
+    fun getApi(endPoint: String, token: String?, enableDebug: Boolean): GrMobileApiService {
 
-        val httpClient = OkHttpClient().newBuilder()
+        val httpClientBuilder = OkHttpClient().newBuilder()
             .addInterceptor(StandardHeadersInterceptor())
-            .addInterceptor(AuthHeaderInterceptor(token))
             .addNetworkInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = if (enableDebug) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
-                }).build()
-
+                })
+        if (token != null) {
+            httpClientBuilder.addInterceptor(AuthHeaderInterceptor(token))
+        }
+        val httpClient = httpClientBuilder.build()
         return Retrofit.Builder()
             .baseUrl(endPoint.replace(Regex("/$"), "") + "/")
             .addConverterFactory(GsonConverterFactory.create())

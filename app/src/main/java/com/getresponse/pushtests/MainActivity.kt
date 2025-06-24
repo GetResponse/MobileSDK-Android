@@ -45,7 +45,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.getresponse.mobile_sdk.GetResponseMobileSDK
+import com.getresponse.mobile_sdk.models.events.Category
+import com.getresponse.mobile_sdk.models.events.Product
 import com.getresponse.pushtests.ui.theme.PushTestsTheme
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -97,168 +100,192 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
-        val result = grSdk.handleIncomingNotification(this, intent)
+        val result = grSdk.pushNotificationsService.handleIncomingNotification(this, intent)
         Log.d("test newIntent", result.toString())
         super.onNewIntent(intent)
     }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val grSdk = GetResponseMobileSDK(
+        grSdk = GetResponseMobileSDK(
             this,
             applicationId,
             entryPoint,
             secretKey,
-            notificationIcon,
         )
 
-        val incomingNotification = grSdk.handleIncomingNotification(this, intent)
+        lifecycleScope.launch {
+            try {
+                grSdk.initialize()
+                val incomingNotification = grSdk.pushNotificationsService.handleIncomingNotification(this@MainActivity, intent)
+                // Continue with setContent...
+                setContent {
+                    setContent {
+                        val scrollState = rememberScrollState()
+                        val clipboardManager: ClipboardManager = LocalClipboardManager.current
+                        val granted = remember { mutableStateOf(false) }
+                        val shouldAsk = remember { mutableStateOf("Nothing yet") }
+                        val token = remember { mutableStateOf<String?>(null) }
+                        val error = remember { mutableStateOf<String?>(null) }
 
-        setContent {
-            val scrollState = rememberScrollState()
-            val clipboardManager: ClipboardManager = LocalClipboardManager.current
-            val granted = remember { mutableStateOf(false) }
-            val shouldAsk = remember { mutableStateOf("Nothing yet") }
-            val token = remember { mutableStateOf<String?>(null) }
-            val error = remember { mutableStateOf<String?>(null) }
+                        val json = remember { mutableStateOf(incomingNotification.toString()) }
+                        val scope = rememberCoroutineScope()
 
-            val json = remember { mutableStateOf(incomingNotification.toString()) }
-            val scope = rememberCoroutineScope()
+                        val requestPermissionLauncher = rememberLauncherForActivityResult(
+                            ActivityResultContracts.RequestPermission(),
+                        ) { _ ->
+                            scope.launch {
+                                checkPermissions(granted, shouldAsk, token, error)
+                            }
+                        }
 
-            val requestPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission(),
-            ) { _ ->
-                scope.launch {
-                    checkPermissions(granted, shouldAsk, token, error)
-                }
-            }
+                        val lifecycleEvent = rememberLifecycleEvent()
+                        LaunchedEffect(lifecycleEvent) {
+                            if (lifecycleEvent == Lifecycle.Event.ON_RESUME) {
+                                checkPermissions(granted, shouldAsk, token, error)
+                            }
+                        }
 
-            val lifecycleEvent = rememberLifecycleEvent()
-            LaunchedEffect(lifecycleEvent) {
-                if (lifecycleEvent == Lifecycle.Event.ON_RESUME) {
-                    checkPermissions(granted, shouldAsk, token, error)
-                }
-            }
+                        PushTestsTheme {
+                            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(30.dp)
+                                        .then(Modifier.fillMaxWidth())
+                                        .verticalScroll(scrollState)
+                                ) {
+                                    Text(text = "POC Push Notifications", style = MaterialTheme.typography.headlineMedium)
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Text(text = "Permission status:", style = MaterialTheme.typography.titleLarge)
+                                    Text(text = if (granted.value) "Granted" else "Not granted", style = MaterialTheme.typography.bodyMedium)
+                                    Spacer(modifier = Modifier.height(20.dp))
 
-            PushTestsTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Column(
-                        modifier = Modifier
-                            .padding(30.dp)
-                            .then(Modifier.fillMaxWidth())
-                            .verticalScroll(scrollState)
-                    ) {
-                        Text(text = "POC Push Notifications", style = MaterialTheme.typography.headlineMedium)
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Text(text = "Permission status:", style = MaterialTheme.typography.titleLarge)
-                        Text(text = if (granted.value) "Granted" else "Not granted", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(20.dp))
+                                    Text(text = "Rationale status:", style = MaterialTheme.typography.titleLarge)
+                                    Text(text = shouldAsk.value, style = MaterialTheme.typography.bodyMedium)
+                                    Spacer(modifier = Modifier.height(20.dp))
 
-                        Text(text = "Rationale status:", style = MaterialTheme.typography.titleLarge)
-                        Text(text = shouldAsk.value, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(20.dp))
+                                    Text(text = "Intent data:", style = MaterialTheme.typography.titleLarge)
+                                    Text(text = json.value, style = MaterialTheme.typography.bodyMedium)
+                                    Text(text = "Notificaiton data:", style = MaterialTheme.typography.titleLarge)
 
-                        Text(text = "Intent data:", style = MaterialTheme.typography.titleLarge)
-                        Text(text = json.value, style = MaterialTheme.typography.bodyMedium)
-                        Text(text = "Notificaiton data:", style = MaterialTheme.typography.titleLarge)
+                                    Spacer(modifier = Modifier.height(20.dp))
 
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        Row {
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    scope.launch {
-                                        try {
-                                            grSdk.consent("en", "externalId", "martom_mb@wp.pl", token.value ?: "")
-                                            Toast.makeText(this@MainActivity, "Consent sent with Email", Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            error.value = e.message
-                                            Log.e("ERROR", e.message ?: "Unknown error", e)
+                                    Row {
+                                        Button(
+                                            modifier = Modifier.weight(1f),
+                                            onClick = {
+                                                scope.launch {
+                                                    try {
+                                                        grSdk.pushNotificationsService.consent("en", "externalId", "martom_mb@wp.pl", token.value ?: "")
+                                                        Toast.makeText(this@MainActivity, "Consent sent with Email", Toast.LENGTH_SHORT).show()
+                                                    } catch (e: Exception) {
+                                                        error.value = e.message
+                                                        Log.e("ERROR", e.message ?: "Unknown error", e)
+                                                    }
+                                                }
+                                            }) {
+                                            Text("Consent with Email")
+                                        }
+                                        Button(
+                                            modifier = Modifier.weight(1f),
+                                            onClick = {
+                                                scope.launch {
+                                                    try {
+                                                        grSdk.pushNotificationsService.consent("en", "externalId", null, token.value ?: "")
+                                                        Toast.makeText(this@MainActivity, "Consent sent without email", Toast.LENGTH_SHORT).show()
+                                                    } catch (e: Exception) {
+                                                        error.value = e.message
+                                                        Log.e("ERROR", e.message ?: "Unknown error", e)
+                                                    }
+                                                }
+                                            }) {
+                                            Text("Consent without Email")
                                         }
                                     }
-                                }) {
-                                Text("Consent with Email")
-                            }
-                            Button(
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    scope.launch {
-                                        try {
-                                            grSdk.consent("en", "externalId", null, token.value ?: "")
-                                            Toast.makeText(this@MainActivity, "Consent sent without email", Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            error.value = e.message
-                                            Log.e("ERROR", e.message ?: "Unknown error", e)
+                                    Button(
+                                        onClick = {
+                                            scope.launch {
+                                                try {
+                                                    grSdk.pushNotificationsService.deleteConsent()
+                                                    Toast.makeText(this@MainActivity, "Deleted consent", Toast.LENGTH_SHORT).show()
+                                                } catch (e: Exception) {
+                                                    error.value = e.message
+                                                    Log.e("ERROR", e.message ?: "Unknown error", e)
+                                                }
+                                            }
+                                        }) {
+                                        Text("Delete consent")
+                                    }
+                                    if (token.value != null) {
+                                        Text(text = "FCM Token:", style = MaterialTheme.typography.titleLarge)
+                                        Text(text = token.value!!, style = MaterialTheme.typography.bodyMedium)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Button(onClick = {
+                                            clipboardManager.setText(AnnotatedString((token.value!!)))
+                                        }) {
+                                            Text("Copy")
+                                        }
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                    }
+
+                                    if (error.value != null) {
+                                        Text(text = "Error:", style = MaterialTheme.typography.titleLarge)
+                                        Text(text = error.value!!, style = MaterialTheme.typography.bodyMedium)
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                    }
+
+
+                                    if (!granted.value) {
+                                        Button(onClick = {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) ==
+                                                    PackageManager.PERMISSION_GRANTED
+                                                ) {
+                                                    scope.launch {
+                                                        checkPermissions(granted, shouldAsk, token, error)
+                                                    }
+                                                } else if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                                                    shouldAsk.value = "Should open settings"
+                                                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                                    val uri = Uri.fromParts("package", packageName, null)
+                                                    intent.data = uri
+                                                    startActivity(intent)
+                                                } else {
+                                                    // Directly ask for the permission
+                                                    requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                }
+                                            }
+                                        }) {
+                                            Text(
+                                                text = if (shouldAsk.value == OPEN_SETTINGS_TEXT) "Open settings" else "Ask for notification permissions",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+
                                         }
                                     }
-                                }) {
-                                Text("Consent without Email")
-                            }
-                        }
-                        Button(
-                            onClick = {
-                                scope.launch {
-                                    try {
-                                        grSdk.deleteConsent()
-                                        Toast.makeText(this@MainActivity, "Deleted consent", Toast.LENGTH_SHORT).show()
-                                    } catch (e: Exception) {
-                                        error.value = e.message
-                                        Log.e("ERROR", e.message ?: "Unknown error", e)
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(onClick = {
+                                        grSdk.eventsService.addViewItemEvent("en", Product("12233ewq"), listOf(Category("123321")))
+                                    }) {
+                                        Text("Add event")
                                     }
-                                }
-                            }) {
-                            Text("Delete consent")
-                        }
-                        if (token.value != null) {
-                            Text(text = "FCM Token:", style = MaterialTheme.typography.titleLarge)
-                            Text(text = token.value!!, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(onClick = {
-                                clipboardManager.setText(AnnotatedString((token.value!!)))
-                            }) {
-                                Text("Copy")
-                            }
-                            Spacer(modifier = Modifier.height(20.dp))
-                        }
-
-                        if (error.value != null) {
-                            Text(text = "Error:", style = MaterialTheme.typography.titleLarge)
-                            Text(text = error.value!!, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(modifier = Modifier.height(20.dp))
-                        }
-
-
-                        if (!granted.value) {
-                            Button(onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) ==
-                                        PackageManager.PERMISSION_GRANTED
-                                    ) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(onClick = {
                                         scope.launch {
-                                            checkPermissions(granted, shouldAsk, token, error)
+                                            grSdk.eventsService.sendEvents()
                                         }
-                                    } else if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
-                                        shouldAsk.value = "Should open settings"
-                                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                        val uri = Uri.fromParts("package", packageName, null)
-                                        intent.data = uri
-                                        startActivity(intent)
-                                    } else {
-                                        // Directly ask for the permission
-                                        requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }) {
+                                        Text("Send events")
                                     }
                                 }
-                            }) {
-                                Text(
-                                    text = if (shouldAsk.value == OPEN_SETTINGS_TEXT) "Open settings" else "Ask for notification permissions",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-
                             }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize SDK", e)
             }
         }
     }
