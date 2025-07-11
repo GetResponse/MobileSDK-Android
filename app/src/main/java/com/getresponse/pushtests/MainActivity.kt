@@ -167,7 +167,7 @@ class MainActivity : ComponentActivity() {
 
                                     Text(text = "Intent data:", style = MaterialTheme.typography.titleLarge)
                                     Text(text = json.value, style = MaterialTheme.typography.bodyMedium)
-                                    Text(text = "Notificaiton data:", style = MaterialTheme.typography.titleLarge)
+                                    Text(text = "Notification data:", style = MaterialTheme.typography.titleLarge)
 
                                     Spacer(modifier = Modifier.height(20.dp))
 
@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
                                             onClick = {
                                                 scope.launch {
                                                     try {
-                                                        grSdk.pushNotificationsService.consent("en", "externalId", "martom_mb@wp.pl", token.value ?: "")
+                                                        grSdk.pushNotificationsService.consent("en", "externalId", email, token.value ?: "")
                                                         Toast.makeText(this@MainActivity, "Consent sent with Email", Toast.LENGTH_SHORT).show()
                                                     } catch (e: Exception) {
                                                         error.value = e.message
