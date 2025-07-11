@@ -46,17 +46,35 @@ val grMobileSDK = GetResponseMobileSDK(
     applicationId,
     entryPoint,
     secretKey,
-    notificationIcon,
-    channelsConfig (optional),  
-    enableDebug (optional)
+    settings: GetResponseSDKSettings (optional)
+
 )
 ```
 Parameters:
 - applicationId, entryPoint, secretKey - Data provided in GetResponse App
-- notificationIcon - Notification Icon Resource ID
-- channelsConfig - (optional) list of notification channels for Android SDKs that supports it. Parameter is optional, and SDK will create channels for you if they don’t exist. It will also create a new channel if channel_id provided in notification created on GetResponse website is missing.
+
+```kotlin
+val grSDKSettings =
+    GetResponseSDKSettings(
+        enablePushNotofications,
+        enableWebEvwnts,
+        notificationIcon (optional),
+        channelsConfig (optional),
+        enableDebug (optional)
+    )
+```
+Parameters:
+- enablePushNotofications - enable push notifications service - default true
+- enableWebEvents- enable web events notifications service - default true
+- notificationIcon - (optional )Notification Icon Resource ID → default icon if null
+- channelsConfig - (optional) list of notification channels for Android SDKs that supports it. Parameter is optional, and SDK will create channels for you if they don’t exist.
+It will also create a new channel if channel_id provided in notification created on GetResponse website is missing.
 - enableDebug - this flag enables logs for http calls.
 
+After configuration SDK has to be initialized.
+```kotlin
+grMobileSDK.initialize()
+``` 
 # Messaging service - handle Incoming Push Message
 
 This point assumes that Firebase Messaging is configured and there is a service extending FirebaseMessagingService
@@ -68,7 +86,7 @@ MessagingService:
 ```kotlin
 override fun onMessageReceived(remoteMessage: RemoteMessage) {
     super.onMessageReceived(remoteMessage)
-    val pushConsumed = grMobileSDK.handleIncomingPush(
+    val pushConsumed = grMobileSDK.pushNotificationsService.handleIncomingPush(
         remoteMessage.data,
         MainActivity::class.java
     )
@@ -86,7 +104,7 @@ override fun onNewToken(token: String) {
     super.onNewToken(token)
     Log.d(TAG, "Refreshed token: $token")
     scope.launch {
-        grMobileSDK.consent(
+        grMobileSDK.pushNotificationsService.consent(
             languageCode,
             externalId,
             email,
@@ -104,7 +122,7 @@ After obtaining fcmToken from Firebase - application has to send consent using G
 ```kotlin
 suspend fun connectMessaging() {
     val token = FirebaseMessaging.getInstance().token.await()
-    grSdk.consent(languageCode, externalId, email, token)
+    grMobileSDK.pushNotificationsService.consent(languageCode, externalId, email, token)
 }
 ```
 
@@ -125,7 +143,7 @@ In the onCreate method of the Activity previously provided in handleIncomingPush
         
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
-            val incomingNotification = grSdk.handleIncomingNotification(this, intent)
+            val incomingNotification = grMobileSDK.pushNotificationsService.handleIncomingNotification(this, intent)
                 
 ```
 Return of this function is a list of parameters provided in the Administration Panel while sending Push Message.
@@ -134,7 +152,7 @@ This method should be run whenever you think GetResponse should stop sending mes
 (primary use case is before the user logs out from the app).
 ```kotlin
 scope.launch {
-    grSdk.deleteConsent()
+    grMobileSDK.pushNotificationsService.deleteConsent()
 }
 ```
 
