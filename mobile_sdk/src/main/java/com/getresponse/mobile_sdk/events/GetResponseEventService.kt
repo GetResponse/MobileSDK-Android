@@ -24,7 +24,7 @@ class GetResponseEventsService(
     private var isAvailable: Boolean = false,
     private var isEnabled: Boolean = false
 ) {
-    private lateinit var shop: Shop
+    private var shop: Shop? = null
     private lateinit var user: User
     private lateinit var endpoint: String
     private lateinit var installationUUID: String
@@ -35,7 +35,7 @@ class GetResponseEventsService(
         return AppInfo("Android", installationUUID, lang)
     }
 
-    internal fun configure(shop: Shop, user: User, endpoint: String, installationUUID: String, enableDebug: Boolean, isAvailable: Boolean) {
+    internal fun configure(shop: Shop?, user: User, endpoint: String, installationUUID: String, enableDebug: Boolean, isAvailable: Boolean) {
         this.shop = shop
         this.user = user
         this.endpoint = endpoint
