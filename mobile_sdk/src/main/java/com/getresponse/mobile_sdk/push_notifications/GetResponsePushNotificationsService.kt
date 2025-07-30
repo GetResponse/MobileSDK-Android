@@ -168,11 +168,9 @@ class GetResponsePushNotificationsService(
     fun handleIncomingNotification(context: Context, intent: Intent?): Map<String, String>? {
         var data: Map<String, String>?
         var actionData: Map<String, String>?
-        var isLocal = true
         val intentWithData = intent ?: return null
         data = getDataFromNotification(intentWithData)
         if (data == null) {
-            isLocal = false
             data = intent.extras?.let { extras ->
                 val map = mutableMapOf<String, String>()
                 extras.keySet().forEach { key ->
@@ -184,7 +182,6 @@ class GetResponsePushNotificationsService(
 
         actionData = getActionDataFromNotification(intentWithData)
         if (actionData == null) {
-            isLocal = false
             actionData = intent.extras?.let { extras ->
                 val map = mutableMapOf<String, String>()
                 extras.keySet().forEach { key ->
@@ -207,11 +204,6 @@ class GetResponsePushNotificationsService(
             context.startActivity(i)
         }
         scope.launch {
-            if (!isLocal) {
-                data["stats_url"]?.let {
-                    getStatsApi(enableDebug).stats(EventType.SHOWED.getEventUrl(it))
-                }
-            }
             data["stats_url"]?.let {
                 getStatsApi(enableDebug).stats(EventType.CLICKED.getEventUrl(it))
             }
